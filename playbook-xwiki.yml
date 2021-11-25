@@ -1,0 +1,161 @@
+---
+- hosts: xwiki
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    # see https://www.xwiki.org/xwiki/bin/view/Download/
+    xwiki_lts_version: 12.10.10
+    # see https://jdbc.postgresql.org/download.html
+    postgresql_jdbc_version: 42.3.1
+  tasks:
+
+  ##############################################
+  ## setup the user, the database and the domain
+  ##############################################
+  - name: ensure user exists
+    hsuser.js: name="{{pac}}-{{user}}" password="{{password}}" exists="true"
+  - name: setup database
+    hsdatabase.js: name="{{pac}}_{{user}}" password="{{password}}" instance="postgresql" exists="true"
+  - name: setup domain
+    hsdomain.js: name="{{domain}}" owner="{{pac}}-{{user}}" exists="true"
+
+  #################################
+  ## setup tomcat
+  #################################
+  - name: install tomcat
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      tomcat9-instance-create tomcat
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/tomcat/conf/catalina.properties"
+
+  - name: copy catalina script
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    copy:
+      src: "/usr/share/tomcat9/bin/catalina.sh"
+      remote_src: yes
+      dest: "/home/pacs/{{pac}}/users/{{user}}/tomcat/bin/catalina.sh"
+
+  - name: replace server.xml
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template:
+      src: "templates/server.xml"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/tomcat/conf/server.xml"
+      mode: 0644
+
+  - name: replace setenv.sh
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template:
+      src: "templates/setenv.sh"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/tomcat/bin/setenv.sh"
+      mode: 0755
+
+  #################################
+  ## setup the XWiki
+  #################################
+  - name: create directory for xwiki
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/webapps/xwiki"
+      state: directory
+  - name: download and install war file for xwiki
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    unarchive:
+      creates: /home/pacs/{{pac}}/users/{{user}}/webapps/xwiki/WEB-INF/xwiki.properties
+      src: https://nexus.xwiki.org/nexus/content/groups/public/org/xwiki/platform/xwiki-platform-distribution-war/{{xwiki_lts_version}}/xwiki-platform-distribution-war-{{xwiki_lts_version}}.war
+      remote_src: yes
+      dest: /home/pacs/{{pac}}/users/{{user}}/webapps/xwiki
+  - name: create data directory for xwiki
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/data"
+      state: directory
+  - name: define permanent directory
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    lineinfile:
+      path: "/home/pacs/{{pac}}/users/{{user}}/webapps/xwiki/WEB-INF/xwiki.properties"
+      regexp: '^environment.permanentDirectory = '
+      insertafter: '^# environment.permanentDirectory = '
+      line: "environment.permanentDirectory = /home/pacs/{{pac}}/users/{{user}}//data"
+  - name: download and install postgresql jdbc
+    # see https://jdbc.postgresql.org/download.html
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    get_url:
+      url: https://jdbc.postgresql.org/download/postgresql-{{postgresql_jdbc_version}}.jar
+      dest: /home/pacs/{{pac}}/users/{{user}}/webapps/xwiki/WEB-INF/lib/postgresql-{{postgresql_jdbc_version}}.jar
+  - name: upload database configuration
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/webapps/xwiki/WEB-INF/hibernate.cfg.xml" src="templates/hibernate.cfg.xml" mode=0600
+
+  #################################
+  ## apache configuration
+  #################################
+  - name: upload .htaccess
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/htdocs-ssl/.htaccess" src="templates/htaccess" mode=0644
+
+  ##################################
+  ## monit & logrotate configuration
+  ##################################
+  - name: create directory for monit
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/monit/var"
+      state: directory
+  - name: upload monit configuration
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/.monitrc" src="templates/monitrc" mode=0600
+  - name: upload logrotate configuration
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/.logrotate" src="templates/logrotate" mode=0600
+  - name: start monit as cronjob
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    cron:
+      name: "start monit at reboot"
+      special_time: reboot
+      job: rm -f $HOME/tomcat/work/catalina.pid && /usr/bin/monit -c "$HOME/.monitrc"
+  - name: run logrotate once a day
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    cron:
+      name: "logrotate"
+      minute: "22"
+      hour: "1"
+      job: "/usr/sbin/logrotate -s $HOME/.logrotate.state $HOME/.logrotate"
+  - name: delete old tomcat logs
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    cron:
+      name: "delete tomcat logs"
+      minute: "14"
+      hour: "3"
+      job: "/usr/bin/find $HOME/tomcat/logs -type f -mmin +10080 -delete"
+
+  ##################################################
+  ## start tomcat service via monit
+  ##################################################
+  - name: start monit
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      /usr/bin/monit -c ".monitrc"
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/var/run/monit.id"
