@@ -13,7 +13,9 @@
     hsdatabase.js: name="{{pac}}_{{user}}" password="{{password}}" instance="postgresql" exists="true"
   - name: setup domain
     hsdomain.js: name="{{domain}}" owner="{{pac}}-{{user}}" exists="true"
-
+  - name: Sleep to avoid issue invalid user for temporary files
+    pause:
+      seconds: 10
   #################################
   ## setup tomcat
   #################################
@@ -58,16 +60,24 @@
     become: yes
     become_user: "{{pac}}-{{user}}"
     file:
-      path: "/home/pacs/{{pac}}/users/{{user}}/webapps/xwiki"
+      path: "/home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT"
       state: directory
   - name: download and install war file for xwiki
     become: yes
     become_user: "{{pac}}-{{user}}"
     unarchive:
-      creates: /home/pacs/{{pac}}/users/{{user}}/webapps/xwiki/WEB-INF/xwiki.properties
+      creates: /home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT/WEB-INF/xwiki.properties
       src: https://nexus.xwiki.org/nexus/content/groups/public/org/xwiki/platform/xwiki-platform-distribution-war/{{xwiki_lts_version}}/xwiki-platform-distribution-war-{{xwiki_lts_version}}.war
       remote_src: yes
-      dest: /home/pacs/{{pac}}/users/{{user}}/webapps/xwiki
+      dest: /home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT
+  - name: define the webapppath
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    lineinfile:
+      path: "/home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT/WEB-INF/xwiki.cfg"
+      regexp: '^xwiki.webapppath=$'
+      insertafter: '^#xwiki.webapppath='
+      line: "xwiki.webapppath="
   - name: create data directory for xwiki
     become: yes
     become_user: "{{pac}}-{{user}}"
@@ -78,7 +88,7 @@
     become: yes
     become_user: "{{pac}}-{{user}}"
     lineinfile:
-      path: "/home/pacs/{{pac}}/users/{{user}}/webapps/xwiki/WEB-INF/xwiki.properties"
+      path: "/home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT/WEB-INF/xwiki.properties"
       regexp: '^environment.permanentDirectory = '
       insertafter: '^# environment.permanentDirectory = '
       line: "environment.permanentDirectory = /home/pacs/{{pac}}/users/{{user}}//data"
@@ -88,11 +98,11 @@
     become_user: "{{pac}}-{{user}}"
     get_url:
       url: https://jdbc.postgresql.org/download/postgresql-{{postgresql_jdbc_version}}.jar
-      dest: /home/pacs/{{pac}}/users/{{user}}/webapps/xwiki/WEB-INF/lib/postgresql-{{postgresql_jdbc_version}}.jar
+      dest: /home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT/WEB-INF/lib/postgresql-{{postgresql_jdbc_version}}.jar
   - name: upload database configuration
     become: yes
     become_user: "{{pac}}-{{user}}"
-    template: dest="/home/pacs/{{pac}}/users/{{user}}/webapps/xwiki/WEB-INF/hibernate.cfg.xml" src="templates/hibernate.cfg.xml" mode=0600
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT/WEB-INF/hibernate.cfg.xml" src="templates/hibernate.cfg.xml" mode=0600
 
   #################################
   ## apache configuration
