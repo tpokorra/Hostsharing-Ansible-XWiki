@@ -14,4 +14,4 @@ xwiki:
       # see https://www.xwiki.org/xwiki/bin/view/Download/
       xwiki_lts_version: 13.10.10
       # see https://jdbc.postgresql.org/download/
-      postgresql_jdbc_version: 42.5.0
+      postgresql_jdbc_version: 42.5.1
