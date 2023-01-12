@@ -92,16 +92,6 @@
     file:
       path: "/home/pacs/{{pac}}/users/{{user}}/xwiki-data/cache/"
       state: directory
-  - name: clear WEB-INF cache
-    become: yes
-    file:
-      path: "/home/pacs/{{pac}}/users/{{user}}/ROOT/WEB-INF/cache/"
-      state: absent
-  - name: recreate directory WEB-INF cache
-    become: yes
-    file:
-      path: "/home/pacs/{{pac}}/users/{{user}}/ROOT/WEB-INF/cache/"
-      state: directory
 
   ############################
   ## start the services again
