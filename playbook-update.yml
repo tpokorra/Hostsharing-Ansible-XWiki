@@ -78,6 +78,19 @@
     get_url:
       url: https://jdbc.postgresql.org/download/postgresql-{{postgresql_jdbc_version}}.jar
       dest: /home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT/WEB-INF/lib/postgresql-{{postgresql_jdbc_version}}.jar
+  - name: find new versions of uploaded plugins
+    become: yes
+    find:
+      paths: "/home/pacs/{{pac}}/users/{{user}}"
+      patterns: '*-{{xwiki_lts_version}}.jar'
+    register: my_plugins
+  - name: install new version of uploaded plugins
+    become: yes
+    copy:
+      remote_src: yes
+      src: "{{ item.path }}"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/tomcat/webapps/ROOT/WEB-INF/lib/"
+    with_items: "{{ my_plugins.files }}"
 
   ######################
   ## drop old caches
