@@ -37,7 +37,10 @@ function hsuser(args) {
     print('{"failed":true,"msg":"parameter exists with value true or false required"}');
     return;
   }
-  shell="/usr/bin/passwd";
+  shell = getParam("shell", params);
+  if (shell == null) {
+    shell="/bin/false";
+  }
   existingUsers = user.search({where:{name:username}});
   if ("false".localeCompare(shouldExist)) {
     if (existingUsers.length < 1) {

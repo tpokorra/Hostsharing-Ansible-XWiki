@@ -8,7 +8,7 @@
   ## setup the user, the database and the domain
   ##############################################
   - name: ensure user exists
-    hsuser.js: name="{{pac}}-{{user}}" password="{{password}}" exists="true"
+    hsuser.js: name="{{pac}}-{{user}}" password="{{password}}" shell="/bin/bash" exists="true"
   - name: setup database
     hsdatabase.js: name="{{pac}}_{{user}}" password="{{password}}" instance="postgresql" exists="true"
   - name: setup domain
