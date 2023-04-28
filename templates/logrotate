@@ -5,10 +5,3 @@
    daily
    missingok
 }
-/home/pacs/{{pac}}/users/{{user}}/monit/var/monit.log {
-   copytruncate
-   compress
-   rotate 2
-   weekly
-   missingok
-}

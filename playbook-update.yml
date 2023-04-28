@@ -6,19 +6,15 @@
   tasks:
 
   ##############################################
-  ## stop all services
+  ## stop service
   ##############################################
-  - name: stop monit and tomcat service
+  - name: stop tomcat service
     become: yes
-    shell: |
-      killall -u `whoami` monit
-      ~/tomcat/bin/shutdown.sh
-      sleep 10
-      ~/tomcat/bin/shutdown.sh
-      sleep 10
-    args:
-      executable: /bin/bash
-      chdir: "/home/pacs/{{pac}}/users/{{user}}"
+    become_user: "{{pac}}-{{user}}"
+    ansible.builtin.systemd:
+      name: tomcat
+      state: stopped
+      scope: user
 
   #################
   ## create backup
@@ -106,17 +102,13 @@
       path: "/home/pacs/{{pac}}/users/{{user}}/xwiki-data/cache/"
       state: directory
 
-  ############################
-  ## start the services again
-  ############################
-  - name: start monit
+  ##############################################
+  ## start service
+  ##############################################
+  - name: start tomcat service
     become: yes
-    shell: |
-      /usr/bin/monit -c ".monitrc"
-    args:
-      executable: /bin/bash
-      chdir: "/home/pacs/{{pac}}/users/{{user}}/"
-      creates: "/home/pacs/{{pac}}/users/{{user}}/var/run/monit.id"
-
-# TODO: manually update on the website, in the browser
-# TODO: manually delete old backups, Backup*.tar.gz, and ROOT_Backup_*
+    become_user: "{{pac}}-{{user}}"
+    ansible.builtin.systemd:
+      name: tomcat
+      state: started
+      scope: user
