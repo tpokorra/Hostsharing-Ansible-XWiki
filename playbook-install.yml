@@ -130,6 +130,12 @@
       minute: "22"
       hour: "1"
       job: "/usr/sbin/logrotate -s $HOME/.logrotate.state $HOME/.logrotate"
+  - name: create directory for tomcat logs
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+      path: "/home/pacs/{{pac}}/users/{{user}}/tomcat/logs"
+      state: directory
   - name: delete old tomcat logs
     become: yes
     become_user: "{{pac}}-{{user}}"
